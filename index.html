@@ -13,8 +13,30 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px}
+    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;
+    min-height:100vh;position:relative;overflow-x:hidden}
+  /* 金质流光背景 */
+  .bg-aura{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .bg-aura span{position:absolute;border-radius:50%;filter:blur(72px);opacity:.62;
+    background:radial-gradient(circle at 30% 30%,var(--gold-soft),transparent 70%);will-change:transform}
+  .bg-aura .a1{width:560px;height:560px;top:-160px;left:-140px;
+    background:radial-gradient(circle at 30% 30%,rgba(201,169,98,.58),transparent 70%);
+    animation:float1 22s ease-in-out infinite}
+  .bg-aura .a2{width:500px;height:500px;top:18%;right:-180px;
+    background:radial-gradient(circle at 30% 30%,rgba(231,217,180,.68),transparent 70%);
+    animation:float2 27s ease-in-out infinite}
+  .bg-aura .a3{width:640px;height:640px;bottom:-240px;left:32%;
+    background:radial-gradient(circle at 30% 30%,rgba(169,138,69,.45),transparent 70%);
+    animation:float3 32s ease-in-out infinite}
+  @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(110px,80px) scale(1.12)}}
+  @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-100px,70px) scale(1.08)}}
+  @keyframes float3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(80px,-90px) scale(1.15)}}
+  /* 粒子互动层 */
+  #particles{position:fixed;inset:0;z-index:1;pointer-events:none}
+  @media (prefers-reduced-motion:reduce){
+    .bg-aura span{animation:none!important}
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;position:relative;z-index:2}
   header.top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
   .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--gold),var(--gold-deep));
     display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
@@ -36,7 +58,8 @@
     color:var(--gold-deep);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
   .cat-title svg{width:18px;height:18px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(264px,1fr));gap:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;
+  .card{background:rgba(255,255,255,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;
     box-shadow:var(--shadow);text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px;
     transition:.18s;position:relative;overflow:hidden}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold);opacity:0;transition:.18s}
@@ -54,6 +77,8 @@
 </style>
 </head>
 <body>
+<div class="bg-aura"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+<canvas id="particles"></canvas>
 <div class="wrap">
   <header class="top">
     <div class="logo"><i data-lucide="boxes"></i></div>
@@ -135,6 +160,69 @@ q.addEventListener('input', render);
 renderChips();
 render();
 lucide.createIcons();
+
+// 粒子互动背景：金色微粒漂浮 + 鼠标拨开 + 邻近淡金连线；尊重系统「减少动态」
+(function(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = document.getElementById('particles');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  let W, H, dpr;
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.width  = Math.floor(innerWidth  * dpr);
+    H = cv.height = Math.floor(innerHeight * dpr);
+    cv.style.width  = innerWidth  + 'px';
+    cv.style.height = innerHeight + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const N = Math.max(28, Math.min(56, Math.floor(innerWidth / 24)));
+  const pts = [];
+  for(let i=0;i<N;i++){
+    pts.push({
+      x: Math.random()*innerWidth, y: Math.random()*innerHeight,
+      vx: (Math.random()-.5)*.25, vy: (Math.random()-.5)*.25,
+      r: Math.random()*1.5 + .6
+    });
+  }
+  const mouse = {x:-9999, y:-9999};
+  window.addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+  window.addEventListener('mouseout',  ()=>{ mouse.x=-9999; mouse.y=-9999; });
+  window.addEventListener('touchmove', e=>{ if(e.touches[0]){ mouse.x=e.touches[0].clientX; mouse.y=e.touches[0].clientY; } }, {passive:true});
+  window.addEventListener('touchend',  ()=>{ mouse.x=-9999; mouse.y=-9999; });
+
+  const LINK = 118, PUSH = 110;
+  function tick(){
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    for(let i=0;i<pts.length;i++){
+      const p = pts[i];
+      p.x += p.vx; p.y += p.vy;
+      if(p.x < 0 || p.x > innerWidth)  p.vx *= -1;
+      if(p.y < 0 || p.y > innerHeight) p.vy *= -1;
+      const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx,dy);
+      if(d < PUSH && d > 0){ const f = (PUSH - d) / PUSH * 1.0; p.x += dx/d*f; p.y += dy/d*f; }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx.fillStyle = 'rgba(201,169,98,.5)';
+      ctx.fill();
+      for(let j=i+1;j<pts.length;j++){
+        const q = pts[j], dd = Math.hypot(p.x-q.x, p.y-q.y);
+        if(dd < LINK){
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+          ctx.strokeStyle = 'rgba(201,169,98,' + (0.12*(1 - dd/LINK)).toFixed(3) + ')';
+          ctx.lineWidth = .6;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
 </script>
 </body>
 </html>
