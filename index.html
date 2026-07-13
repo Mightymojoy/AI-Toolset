@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ITO · AI 工具集</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root{
+    --gold:#c9a962; --gold-soft:#e7d9b4; --gold-deep:#a98a45;
+    --bg:#faf6ef; --card:#ffffff; --ink:#2c2620; --muted:#8a8175;
+    --line:#ece4d6; --shadow:0 6px 22px rgba(120,96,52,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px}
+  header.top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--gold),var(--gold-deep));
+    display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+  .logo svg{width:22px;height:22px}
+  h1{font-size:25px;font-weight:700;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:14px;margin:2px 0 22px}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+  .search{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+  .search svg{width:17px;height:17px;color:var(--muted);flex:none}
+  .search input{border:none;outline:none;background:transparent;font-size:14px;width:100%;color:var(--ink)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--muted);
+    padding:7px 15px;border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;user-select:none}
+  .chip:hover{border-color:var(--gold-soft)}
+  .chip.active{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+  .cat-block{margin-top:30px}
+  .cat-title{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:700;
+    color:var(--gold-deep);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .cat-title svg{width:18px;height:18px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(264px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;
+    box-shadow:var(--shadow);text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px;
+    transition:.18s;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold);opacity:0;transition:.18s}
+  .card:hover{transform:translateY(-3px);border-color:var(--gold-soft);box-shadow:0 12px 28px rgba(120,96,52,.14)}
+  .card:hover::before{opacity:1}
+  .card h3{font-size:15.5px;font-weight:650;line-height:1.35}
+  .card .url{font-size:12px;color:var(--muted);word-break:break-all;display:flex;align-items:center;gap:6px}
+  .card .url svg{width:13px;height:13px;flex:none}
+  .tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}
+  .tag{font-size:11px;padding:3px 9px;border-radius:8px;font-weight:600}
+  .tag.cat{background:var(--gold-soft);color:var(--gold-deep)}
+  .tag.src{background:#f1ede6;color:#7a7264}
+  .tag.login{background:#f7e9e9;color:#b45454}
+  .empty{color:var(--muted);text-align:center;padding:50px 0;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo"><i data-lucide="boxes"></i></div>
+    <h1>ITO · AI 工具集</h1>
+  </header>
+  <p class="sub">团队内部 AI 工具与文档统一入口 · 点击卡片跳转对应网页</p>
+
+  <div class="bar">
+    <label class="search">
+      <i data-lucide="search"></i>
+      <input id="q" type="text" placeholder="搜索工具名称…" />
+    </label>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const DATA = [{"group": "自建网页", "name": "ITO产品销售分析看板", "url": "https://ito-opal.vercel.app/product_dashboard.html", "cat": "数据看板"}, {"group": "自建网页", "name": "ITO电商渠道业绩看板", "url": "https://ito-opal.vercel.app/channel_dashboard.html", "cat": "数据看板"}, {"group": "自建网页", "name": "ITO产品介绍", "url": "https://mightymojoy.github.io/-product/index.html", "cat": "知识库与文档"}, {"group": "自建网页", "name": "抖音主播数据看板", "url": "https://mightymojoy.github.io/live-dashboard/index.html", "cat": "数据看板"}, {"group": "自建网页", "name": "抖音主播数据趋势分析", "url": "https://mightymojoy.github.io/live-dashboard/trend.html", "cat": "数据看板"}, {"group": "自建网页", "name": "抖音店铺数据看板", "url": "https://mightymojoy.github.io/douyin_dashboard/", "cat": "数据看板"}, {"group": "自建网页", "name": "内容短视频数据看板", "url": "https://mightymojoy.github.io/Content-short-video/", "cat": "数据看板"}, {"group": "自建网页", "name": "ITO内容生成摄影提示词", "url": "https://mightymojoy.github.io/photography-prompt/", "cat": "内容创作工具"}, {"group": "自建网页", "name": "ITO内容短视频脚本生成器", "url": "https://mightymojoy.github.io/DY-short-videos/", "cat": "内容创作工具"}, {"group": "自建网页", "name": "ITO摄影提示词精准控制生成", "url": "https://mightymojoy.github.io/ITO-PROMPT-STUDIO/ITO-Prompt-Studio.html", "cat": "内容创作工具"}, {"group": "自建网页", "name": "内容排版助手", "url": "https://layout-beta-lyart.vercel.app/", "cat": "内容创作工具"}, {"group": "自建网页", "name": "ITO新品介绍", "url": "https://itonewproduct.vercel.app/", "cat": "知识库与文档"}, {"group": "自建网页", "name": "ITO AI 考试智能评分", "url": "https://ito-ai-grading.vercel.app/", "cat": "知识库与文档"}, {"group": "自建网页", "name": "ITO FCST预测", "url": "https://mightymojoy.github.io/fcst_dashboard/", "cat": "数据看板"}, {"group": "自建网页", "name": "ITO 提示词-基础操作-职场版", "url": "https://mightymojoy.github.io/PROMPT/", "cat": "知识库与文档"}, {"group": "自建网页", "name": "AI 自建小工具", "url": "https://mightymojoy.github.io/AI-WORKSHOP/ITO_AI%E5%B7%A5%E4%BD%9C%E5%9D%8A_%E5%AD%A6%E5%91%98%E7%89%88.html", "cat": "知识库与文档"}, {"group": "自建网页", "name": "京东毛保监控", "url": "https://66396c5698674ebe9ee8a78092ef1298.app.codebuddy.work/", "cat": "数据看板"}, {"group": "自建网页", "name": "店铺优惠券数据监控", "url": "https://metabase.doris.itocases.com/question/81?trade_time=2026-07&shop_no=01", "cat": "数据看板"}, {"group": "飞书文档", "name": "每日库存表", "url": "https://my.feishu.cn/wiki/CgBmw84OSikaKZk0jImckrNjnug?sheet=kGV1ky", "cat": "数据表"}, {"group": "飞书文档", "name": "京东毛保", "url": "https://my.feishu.cn/wiki/W6vewSdagixfhOkNqA0cAWtPn2e?sheet=iC9wkH", "cat": "数据表"}, {"group": "飞书文档", "name": "电商渠道业绩", "url": "https://my.feishu.cn/sheets/CtZuseYAyhrJPgtGBxFc755Vnge?sheet=JOlwMJ", "cat": "数据表"}, {"group": "飞书文档", "name": "电商渠道商品", "url": "https://my.feishu.cn/sheets/RKudsmnm3h2cOPtvv4ScTEzSnCh", "cat": "数据表"}];
+const CATS = ["数据看板", "知识库与文档", "内容创作工具", "数据表"];
+const ICONS = { "数据看板":"bar-chart-3", "知识库与文档":"book-open", "内容创作工具":"pen-tool", "数据表":"table" };
+
+const content = document.getElementById('content');
+const chips = document.getElementById('chips');
+const q = document.getElementById('q');
+let activeCat = "全部";
+
+function renderChips(){
+  chips.innerHTML = "";
+  const all = ["全部", ...CATS];
+  all.forEach(c=>{
+    const el = document.createElement('span');
+    el.className = 'chip' + (c===activeCat?' active':'');
+    el.textContent = c;
+    el.onclick = ()=>{ activeCat = c; renderChips(); render(); };
+    chips.appendChild(el);
+  });
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+function card(e){
+  const icon = ICONS[e.cat] || "box";
+  const tags = `<div class="tags">
+      <span class="tag cat">${esc(e.cat)}</span>
+    </div>`;
+  return `<a class="card" href="${esc(e.url)}" target="_blank" rel="noopener">
+      <h3>${esc(e.name)}</h3>
+      ${tags}
+    </a>`;
+}
+
+function render(){
+  const kw = q.value.trim().toLowerCase();
+  const filtered = DATA.filter(e=>{
+    const okCat = activeCat==="全部" || e.cat===activeCat;
+    const okKw = !kw || e.name.toLowerCase().includes(kw) || e.url.toLowerCase().includes(kw);
+    return okCat && okKw;
+  });
+
+  if(!filtered.length){ content.innerHTML = '<div class="empty">没有匹配的工具</div>'; lucide.createIcons(); return; }
+
+  // 按分类分块
+  let html = "";
+  CATS.forEach(cat=>{
+    const list = filtered.filter(e=>e.cat===cat);
+    if(!list.length) return;
+    html += `<section class="cat-block">
+        <div class="cat-title"><i data-lucide="${ICONS[cat]||'box'}"></i>${esc(cat)}<span style="color:var(--muted);font-weight:400;font-size:13px"> · ${list.length}</span></div>
+        <div class="grid">${list.map(card).join('')}</div>
+      </section>`;
+  });
+  content.innerHTML = html;
+  lucide.createIcons();
+}
+
+q.addEventListener('input', render);
+renderChips();
+render();
+lucide.createIcons();
+</script>
+</body>
+</html>
