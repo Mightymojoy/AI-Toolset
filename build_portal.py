@@ -239,6 +239,11 @@ renderChips();render();lucide.createIcons();
 </html>
 """
 
+HTML = (HTML
+        .replace("__DATA__", data_json)
+        .replace("__CATS__", cats_json)
+        .replace("__GEN__", gen_time))
+
 with open(OUT, "w", encoding="utf-8") as f:
     f.write(HTML)
 
