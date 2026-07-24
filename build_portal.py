@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 AI 工具集门户生成器（Tech 粒子版）
-读取 E:\AI工具集\AI 工具集.xlsx 的 Sheet1，自动生成 index.html。
+读取 E:/AI工具集/AI 工具集.xlsx 的 Sheet1，自动生成 index.html。
 表格结构（Sheet1）：
   - 分组行：A列有值、B/C为空  -> 作为来源分组（如「自建网页」「飞书文档」）
   - 表头行：AI智能体名称 / 对应链接 / 分类
@@ -21,6 +21,10 @@ ws = wb["Sheet1"]
 
 entries = []
 group = None
+skipped_header = 0
+skipped_group = 0
+skipped_incomplete = []
+HEADER_WORDS = {"AI智能体名称", "名称", "工具名", "工具名称", "对应链接", "链接"}
 for row in ws.iter_rows(values_only=True):
     cells = list(row) + [None, None, None]
     a, b, c = cells[0], cells[1], cells[2]
@@ -29,11 +33,18 @@ for row in ws.iter_rows(values_only=True):
     a_s = str(a).strip() if a is not None else ""
     b_s = str(b).strip() if b is not None else ""
     c_s = str(c).strip() if c is not None else ""
+    if not a_s:
+        continue
+    # 表头行：名称/链接/分类 这类标题行跳过
+    if a_s in HEADER_WORDS:
+        skipped_header += 1
+        continue
+    # 分组行：只有 A 列（来源分组标题）
     if a_s and not b_s and not c_s:
         group = a_s
+        skipped_group += 1
         continue
-    if a_s == "AI智能体名称":
-        continue
+    # 数据行：三列都有值才收录；残缺行（只填了名字）明确提示，不再静默丢弃
     if a_s and b_s and c_s:
         entries.append({
             "group": group or "",
@@ -41,6 +52,8 @@ for row in ws.iter_rows(values_only=True):
             "url": b_s,
             "cat": c_s,
         })
+    else:
+        skipped_incomplete.append(a_s)
 
 if not entries:
     raise SystemExit("未从表格中解析到任何工具条目，请检查 Sheet1 结构。")
@@ -248,4 +261,7 @@ with open(OUT, "w", encoding="utf-8") as f:
     f.write(HTML)
 
 print(f"OK 解析到 {len(entries)} 个工具，分类 {cats}")
+print(f"  - 表头跳过 {skipped_header} 行，分组标题 {skipped_group} 个")
+if skipped_incomplete:
+    print(f"  - 警告：{len(skipped_incomplete)} 行只有名称、缺少链接或分类，未收录 -> {skipped_incomplete}")
 print(f"已生成 -> {OUT}")
