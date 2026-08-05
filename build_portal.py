@@ -1,267 +1,209 @@
 # -*- coding: utf-8 -*-
 """
-AI 工具集门户生成器（Tech 粒子版）
-读取 E:/AI工具集/AI 工具集.xlsx 的 Sheet1，自动生成 index.html。
+AI 工具集门户生成器（未来玻璃版 / glass build）
+读取同目录下「AI 工具集.xlsx」的 Sheet1，自动生成玻璃拟态风格 index.html。
+
 表格结构（Sheet1）：
-  - 分组行：A列有值、B/C为空  -> 作为来源分组（如「自建网页」「飞书文档」）
-  - 表头行：AI智能体名称 / 对应链接 / 分类
-  - 数据行：三个单元格都有值 -> {name, url, cat, group}
-新增工具：直接在表格里加一行即可，重跑本脚本即可刷新门户。
+  - 分组行：A列有值、B/C为空  -> 来源分组（如「自建网页」「飞书文档」），仅作诊断信息
+  - 表头行：含「AI智能体名称 / 对应链接 / 分类」等标题词 -> 跳过
+  - 数据行：三列都有值 -> {name, url, cat}
+  - 锁定的工具：名称含「暂未解锁 / 待解锁」或链接为空 -> 标为 locked（灰显、不跳外链）
+
+设计说明：
+  - 视觉/中英双语/I18N/动画全部来自 portal_template.html（玻璃版模板），本脚本只负责填数据
+  - 每个工具的中英描述与图标按「工具名」映射到 TOOL_META；分类的中英名/图标/主题色来自 CAT_ORDER
+  - xlsx 仅作为工具清单来源，结构不变；新增工具直接在表格里加一行，重跑脚本即可刷新门户
 """
 import openpyxl
 import json
 import os
+import re
 import datetime
 
-SRC = r"E:\AI工具集\AI 工具集.xlsx"
-OUT = r"E:\AI工具集\index.html"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(SCRIPT_DIR, "AI 工具集.xlsx")
+TEMPLATE = os.path.join(SCRIPT_DIR, "portal_template.html")
+OUT = os.path.join(SCRIPT_DIR, "index.html")
 
-wb = openpyxl.load_workbook(SRC, data_only=True)
-ws = wb["Sheet1"]
 
-entries = []
-group = None
-skipped_header = 0
-skipped_group = 0
-skipped_incomplete = []
-HEADER_WORDS = {"AI智能体名称", "名称", "工具名", "工具名称", "对应链接", "链接"}
-for row in ws.iter_rows(values_only=True):
-    cells = list(row) + [None, None, None]
-    a, b, c = cells[0], cells[1], cells[2]
-    if a is None and b is None and c is None:
-        continue
-    a_s = str(a).strip() if a is not None else ""
-    b_s = str(b).strip() if b is not None else ""
-    c_s = str(c).strip() if c is not None else ""
-    if not a_s:
-        continue
-    # 表头行：名称/链接/分类 这类标题行跳过
-    if a_s in HEADER_WORDS:
-        skipped_header += 1
-        continue
-    # 分组行：只有 A 列（来源分组标题）
-    if a_s and not b_s and not c_s:
-        group = a_s
-        skipped_group += 1
-        continue
-    # 数据行：三列都有值才收录；残缺行（只填了名字）明确提示，不再静默丢弃
-    if a_s and b_s and c_s:
-        entries.append({
-            "group": group or "",
-            "name": a_s,
-            "url": b_s,
-            "cat": c_s,
+def _norm(s):
+    """归一化：去空格 + 去全角/半角括号及其中内容。"""
+    s = s.replace(" ", "")
+    s = re.sub(r"[（(].*?[)）]", "", s)
+    return s.strip()
+
+
+def _clean_name(name):
+    """清洗工具名：去掉「（暂未解锁）」等标记。"""
+    n = re.sub(r"[（(]?(暂未解锁|待解锁)[)）]?", "", name)
+    return n.strip()
+
+
+def _is_locked(name, url):
+    if "暂未解锁" in name or "待解锁" in name:
+        return True
+    if not url or url.strip().lower() in ("#", "locked", "todo"):
+        return True
+    return False
+
+
+# ---------- 分类定义（显示顺序 / 中英名 / 图标 / 主题色）----------
+CAT_ORDER = [
+    ("数据看板",     "dash",  "Dashboards",        "dashboard", "#7C3AED"),
+    ("知识库与文档", "docs",  "Docs & Knowledge",  "bookOpen",  "#EC4899"),
+    ("内容创作工具", "create", "Content Tools",     "pen",      "#06B6D4"),
+    ("数据表",       "sheet", "Data Tables",        "table",    "#7C3AED"),
+    ("AI资讯",       "news",  "AI News",            "news",     "#EC4899"),
+]
+CAT_KEYS = [c[1] for c in CAT_ORDER]
+# 分类名归一化（去空格、去全角括号）-> key
+CAT_ALIAS = {}
+for raw, key, *_ in CAT_ORDER:
+    CAT_ALIAS[_norm(raw)] = key
+CAT_ALIAS["ai资讯"] = "news"   # xlsx 无空格写法兜底
+
+# 分类兜底描述（当某工具名不在 TOOL_META 时使用）
+CAT_DESC = {
+    "dash":   {"zh": "按系列 / 渠道追踪各项数据", "en": "Track data by series and channel"},
+    "docs":   {"zh": "产品资料与知识沉淀",       "en": "Product docs and knowledge"},
+    "create": {"zh": "内容创作提效工具",         "en": "Content creation tools"},
+    "sheet":  {"zh": "飞书数据明细表",           "en": "Feishu data sheets"},
+    "news":   {"zh": "AI 行业每日速览",          "en": "Daily AI industry digest"},
+}
+CAT_ICON = {c[1]: c[3] for c in CAT_ORDER}
+
+# ---------- 工具富文本映射（key = 清洗后的工具名）----------
+# 值：(zh 描述, en 描述, 图标)
+TOOL_META = {
+    "ITO产品销售分析看板":      ("按系列 SKU 拆解销售表现",            "Sales performance by series and SKU",            "barChart"),
+    "ITO电商渠道业绩看板":      ("9 渠道月度目标与实际追踪",          "9 channels: monthly target vs actual",          "trending"),
+    "抖音主播数据看板":         ("三店主播实时直播数据",               "Live-stream data across 3 stores",               "monitor"),
+    "抖音主播数据趋势分析":     ("主播历史趋势与对比",                 "Host trends and comparison",                     "activity"),
+    "抖音店铺数据看板":         ("抖音自营店铺经营概览",               "Douyin store operations overview",               "store"),
+    "京东毛保监控":             ("京东自营毛利保护每日看板",           "JD self-operated margin protection daily",       "shield"),
+    "店铺优惠券数据监控":       ("优惠券投放与核销监控",               "Coupon delivery and redemption monitor",         "ticket"),
+    "ITO库存看板":              ("全渠道库存水位与周转",               "Omni-channel inventory and turnover",            "package"),
+    "ITO产品介绍":              ("全系产品资料与卖点",                 "Full product catalog and selling points",        "book"),
+    "ITO新品介绍":              ("新品上市资料中心",                   "New product launch resource center",            "sparkles"),
+    "新品上线进度概览":         ("新品上市流程进度看板",               "New product launch progress board",              "kanban"),
+    "ITO AI AGENT 测试":        ("AI 评分与 Agent 测试台",             "AI scoring and agent testing bench",             "bot"),
+    "AI培训视频讲解":           ("AI 实操培训视频（待解锁）",          "AI hands-on training videos (locked)",           "play"),
+    "ITO内容短视频脚本生成器":   ("抖音短视频脚本一键生成",             "One-click Douyin short-video scripts",           "video"),
+    "ITO摄影提示词精准控制生成": ("产品摄影提示词工坊",                 "Product photography prompt studio",              "camera"),
+    "每日库存表":               ("飞书每日库存明细表",                 "Feishu daily inventory sheet",                    "table"),
+    "京东毛保":                 ("京东毛保明细数据表",                  "JD margin-protection data sheet",                 "table"),
+    "电商渠道业绩":             ("渠道业绩明细表",                     "Channel performance sheet",                       "table"),
+    "电商渠道商品":             ("渠道在售商品表",                     "Channel product listing sheet",                   "table"),
+    "新品上市全流程":           ("新品上市流程管理表",                 "New product launch workflow sheet",               "table"),
+    "AI HOT 每日晨报":          ("每日 AI 行业早报",                   "Daily AI industry morning brief",                 "zap"),
+}
+
+
+def main():
+    if not os.path.exists(SRC):
+        raise SystemExit("未找到数据源：%s" % SRC)
+    if not os.path.exists(TEMPLATE):
+        raise SystemExit("未找到模板：%s" % TEMPLATE)
+
+    wb = openpyxl.load_workbook(SRC, data_only=True)
+    ws = wb["Sheet1"]
+
+    HEADER_WORDS = {"AI智能体名称", "名称", "工具名", "工具名称", "对应链接", "链接", "分类"}
+    raw_entries = []          # 顺序保留的原始数据行
+    skipped_header = 0
+    skipped_group = 0
+    skipped_incomplete = []
+    group = None
+
+    for row in ws.iter_rows(values_only=True):
+        cells = list(row) + [None, None, None]
+        a, b, c = cells[0], cells[1], cells[2]
+        if a is None and b is None and c is None:
+            continue
+        a_s = str(a).strip() if a is not None else ""
+        b_s = str(b).strip() if b is not None else ""
+        c_s = str(c).strip() if c is not None else ""
+        if not a_s:
+            continue
+        if a_s in HEADER_WORDS:
+            skipped_header += 1
+            continue
+        if a_s and not b_s and not c_s:   # 分组行
+            group = a_s
+            skipped_group += 1
+            continue
+        if a_s and b_s and c_s:
+            raw_entries.append({"group": group or "", "name": a_s, "url": b_s, "cat": c_s})
+        else:
+            skipped_incomplete.append(a_s)
+
+    if not raw_entries:
+        raise SystemExit("未从表格中解析到任何工具条目，请检查 Sheet1 结构。")
+
+    # ---------- 构建 TOOLS ----------
+    tools = []
+    unknown_cats = []
+    for e in raw_entries:
+        clean = _clean_name(e["name"])
+        locked = _is_locked(e["name"], e["url"])
+        cat_key = CAT_ALIAS.get(_norm(e["cat"]))
+        if cat_key is None:
+            unknown_cats.append(e["cat"])
+            cat_key = CAT_KEYS[0]   # 兜底，避免整页崩
+        meta = TOOL_META.get(clean)
+        if meta:
+            desc_zh, desc_en, icon = meta
+        else:
+            d = CAT_DESC.get(cat_key, CAT_DESC[CAT_KEYS[0]])
+            desc_zh, desc_en = d["zh"], d["en"]
+            icon = CAT_ICON.get(cat_key, "box")
+        tools.append({
+            "cat": cat_key,
+            "name": clean,
+            "url": ("" if locked else e["url"]),
+            "icon": icon,
+            "desc": {"zh": desc_zh, "en": desc_en},
+            "locked": locked,
         })
-    else:
-        skipped_incomplete.append(a_s)
 
-if not entries:
-    raise SystemExit("未从表格中解析到任何工具条目，请检查 Sheet1 结构。")
+    # ---------- 构建 CATS（仅包含实际出现的分类，保持显示顺序）----------
+    seen = []
+    for k in CAT_KEYS:
+        if any(t["cat"] == k for t in tools):
+            seen.append(k)
+    cats = []
+    for raw, key, en_label, icon, accent in CAT_ORDER:
+        if key in seen:
+            cats.append({
+                "key": key,
+                "label": {"zh": raw, "en": en_label},
+                "icon": icon,
+                "accent": accent,
+            })
 
-# 分类顺序（按出现顺序去重）
-cats = []
-for e in entries:
-    if e["cat"] not in cats:
-        cats.append(e["cat"])
+    cats_json = json.dumps(cats, ensure_ascii=False)
+    tools_json = json.dumps(tools, ensure_ascii=False)
+    gen_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-data_json = json.dumps(entries, ensure_ascii=False)
-cats_json = json.dumps(cats, ensure_ascii=False)
-gen_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(TEMPLATE, "r", encoding="utf-8") as f:
+        html = f.read()
+    html = (html
+            .replace("window.__CATS__", cats_json)
+            .replace("window.__TOOLS__", tools_json)
+            .replace("__GEN__", gen_time))
 
-# 分类颜色映射表
-CAT_COLORS = {
-    "数据看板": {"color": "#c9a962", "bg": "linear-gradient(135deg,#faf8f5,#f8f4ee)"},
-    "知识库与文档": {"color": "#6bb5a8", "bg": "linear-gradient(135deg,#f5f8f7,#eef5f2)"},
-    "内容创作工具": {"color": "#d4856e", "bg": "linear-gradient(135deg,#faf6f5,#f8f0ec)"},
-    "数据表": {"color": "#a09ac9", "bg": "linear-gradient(135deg,#f6f5fa,#f0edf8)"},
-}
-def cat_color(c):
-    return CAT_COLORS.get(c, {"color": "#c9a962", "bg": "linear-gradient(135deg,#faf8f5,#f8f4ee)"})
+    with open(OUT, "w", encoding="utf-8") as f:
+        f.write(html)
 
-html_body_blocks = ""
-for cat in cats:
-    clr = cat_color(cat)
-    html_body_blocks += (
-        f'  .s-{cats.index(cat)} .section-bg{{background:{clr["bg"]}}}'
-        f'  .s-{cats.index(cat)} .section-deco{{background:{clr["color"]}}}'
-        f'  .s-{cats.index(cat)} .accent-line{{background:linear-gradient(90deg,{clr["color"]}55,transparent)}}'
-        f'  .s-{cats.index(cat)} .card-icon{{background:{clr["color"]}26}}'
-        f'  .s-{cats.index(cat)} .card-icon svg{{color:{clr["color"]}}}'
-        f'  .s-{cats.index(cat)} .card:hover .name{{color:{clr["color"]}}}'
-        f'  .s-{cats.index(cat)} .section-deco-corner{{border-color:{clr["color"]}}}'
-        f'\n'
-    )
+    print("OK 解析到 %d 个工具，分类 %d 个" % (len(tools), len(cats)))
+    print("  - 表头跳过 %d 行，分组标题 %d 个" % (skipped_header, skipped_group))
+    if skipped_incomplete:
+        print("  - 警告：%d 行只有名称、缺少链接或分类，未收录 -> %s" % (len(skipped_incomplete), skipped_incomplete))
+    if unknown_cats:
+        print("  - 警告：%d 个未知分类已兜底到首类 -> %s" % (len(unknown_cats), sorted(set(unknown_cats))))
+    print("  - 锁定工具：%s" % ([t["name"] for t in tools if t["locked"]] or "无"))
+    print("已生成 -> %s" % OUT)
 
-HTML = r"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ITO · AI 工具集</title>
-<script src="https://unpkg.com/lucide@latest"></script>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-    background:#fcfcfc;color:#0b0b0b;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
-  body::before{content:"";position:fixed;inset:0;z-index:0;
-    background-image:radial-gradient(#e4e4e4 .6px,transparent .6px);background-size:24px 24px;pointer-events:none}
-  #particles{position:fixed;inset:0;z-index:1;pointer-events:none}
-  @media (prefers-reduced-motion:reduce){#particles{display:none}}
-  .wrap{max-width:1080px;margin:0 auto;padding:44px 24px 72px;position:relative;z-index:2}
-  .nav{display:flex;align-items:center;gap:20px;margin-bottom:36px;padding-bottom:14px;border-bottom:1px solid #eee}
-  .nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:#0b0b0b;flex:none}
-  .nav-brand .mark{width:26px;height:26px;border-radius:6px;background:#c9a962;display:flex;align-items:center;justify-content:center;color:#fff}
-  .nav-brand .mark svg{width:13px;height:13px}
-  .nav-brand span{font-size:13px;font-weight:600}
-  .nav-info{font-size:12px;color:#a0a0a0;margin-left:auto}
-  .hero{margin-bottom:36px}
-  .hero h1{font-size:28px;font-weight:540;letter-spacing:-.6px}
-  .hero h1 em{font-style:normal;color:#c9a962}
-  .hero p{font-size:13.5px;color:#7a7a7a;margin-top:6px}
-  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:28px}
-  .chips{display:flex;flex-wrap:wrap;gap:4px}
-  .chip{padding:5px 13px;border-radius:6px;font-size:12.5px;cursor:pointer;transition:.1s;
-    color:#7a7a7a;background:transparent;user-select:none;border:none;font-family:inherit}
-  .chip:hover{color:#0b0b0b;background:#f3f3f3}
-  .chip.active{background:#0b0b0b;color:#fff}
-  .search{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;
-    border:1px solid #e8e8e8;width:180px;margin-left:auto}
-  .search:focus-within{border-color:#c0c0c0}
-  .search svg{width:13px;height:13px;color:#c0c0c0;flex:none}
-  .search input{border:none;outline:none;background:transparent;font-size:12.5px;width:100%;color:#0b0b0b;font-family:inherit}
-  .search input::placeholder{color:#c0c0c0}
-  .section{border-radius:16px;padding:22px 22px 18px;margin-bottom:18px;position:relative;overflow:hidden;
-    animation:fadeUp .45s ease both}
-  .section:nth-child(1){animation-delay:0s}
-  .section:nth-child(2){animation-delay:.08s}
-  .section:nth-child(3){animation-delay:.16s}
-  .section:nth-child(4){animation-delay:.24s}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-  .section-bg{position:absolute;inset:0;border-radius:16px}
-  .section-deco{position:absolute;top:-40px;right:-40px;width:120px;height:120px;
-    border-radius:50%;opacity:.12;pointer-events:none;transition:.4s ease}
-  .section:hover .section-deco{transform:scale(1.3);opacity:.18}
-  .section-deco-corner{position:absolute;top:0;right:0;width:36px;height:36px;
-    border-top:2px solid;border-right:2px solid;border-radius:0 14px 0 0;opacity:0;transition:.3s}
-  .section:hover .section-deco-corner{opacity:.2}
-  .section-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;position:relative;z-index:1}
-  .section-header h2{font-size:12.5px;font-weight:600;color:#5a5a5a;letter-spacing:.6px}
-  .section-header .count{font-size:11px;color:#b8b8b8;background:rgba(0,0,0,.04);padding:0 8px;border-radius:4px;line-height:18px}
-  .section-header .accent-line{flex:1;height:1px;margin-left:8px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px;position:relative;z-index:1}
-  .card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
-    text-decoration:none;color:#0b0b0b;transition:.15s}
-  .card:hover{background:rgba(255,255,255,.92);backdrop-filter:blur(6px);box-shadow:0 2px 8px rgba(0,0,0,.04);transform:translateY(-1px)}
-  .card-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none;transition:.15s}
-  .card-icon svg{width:14px;height:14px}
-  .card-body .name{font-size:13px;font-weight:500;transition:.15s}
-  .card-body .meta{font-size:11px;color:#a0a0a0;margin-top:1px}
-  .card:hover .card-icon{transform:scale(1.08)}
-  .empty{color:#b8b8b8;text-align:center;padding:60px 0;font-size:13px}
-""" + html_body_blocks + """</style>
-</head>
-<body>
-<canvas id="particles"></canvas>
-<div class="wrap">
-  <div class="nav">
-    <a class="nav-brand" href="#">
-      <div class="mark"><i data-lucide="boxes"></i></div>
-      <span>ITO</span>
-    </a>
-    <div class="nav-info">AI Toolset &middot; __GEN__</div>
-  </div>
-  <div class="hero">
-    <h1>AI <em>Toolset</em></h1>
-    <p>ITO 团队内部 AI 工具与文档统一入口</p>
-  </div>
-  <div class="bar">
-    <div class="chips" id="chips"></div>
-    <label class="search"><i data-lucide="search"></i><input id="q" type="text" placeholder="Search..." /></label>
-  </div>
-  <div id="content"></div>
-</div>
-<script>
-// ===== Particle System =====
-(function(){
-  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
-  var cv=document.getElementById('particles');if(!cv)return;
-  var ctx=cv.getContext('2d');var W,H,dpr;
-  function resize(){
-    dpr=Math.min(window.devicePixelRatio||1,2);
-    W=cv.width=Math.floor(innerWidth*dpr);H=cv.height=Math.floor(innerHeight*dpr);
-    cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-  resize();window.addEventListener('resize',resize);
-  var N=Math.max(20,Math.min(45,Math.floor(innerWidth/32)));
-  var pts=[];
-  for(var i=0;i<N;i++){pts.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,vx:(Math.random()-.5)*.15,vy:-(Math.random()*.2+.05),r:Math.random()*1.2+.5,phase:Math.random()*6.283});}
-  var m={x:-9999,y:-9999};
-  window.addEventListener('mousemove',function(e){m.x=e.clientX;m.y=e.clientY;});
-  window.addEventListener('mouseout',function(){m.x=-9999;m.y=-9999;});
-  window.addEventListener('touchmove',function(e){if(e.touches[0]){m.x=e.touches[0].clientX;m.y=e.touches[0].clientY;}},{passive:true});
-  window.addEventListener('touchend',function(){m.x=-9999;m.y=-9999;});
-  var LNK=130,PSH=100,t=0;
-  function tick(){
-    t+=0.008;ctx.clearRect(0,0,innerWidth,innerHeight);
-    for(var i=0;i<pts.length;i++){
-      var p=pts[i];p.x+=p.vx+Math.sin(t+p.phase)*.08;p.y+=p.vy;
-      if(p.y<-10){p.y=innerHeight+10;p.x=Math.random()*innerWidth;}
-      if(p.x<-10)p.x=innerWidth+10;if(p.x>innerWidth+10)p.x=-10;
-      var dx=p.x-m.x,dy=p.y-m.y,d=Math.hypot(dx,dy);
-      if(d<PSH&&d>0){var f=(PSH-d)/PSH*.6;p.x+=dx/d*f;p.y+=dy/d*f;}
-      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.283);ctx.fillStyle='rgba(201,169,98,.35)';ctx.fill();
-      for(var j=i+1;j<pts.length;j++){var q=pts[j],dd=Math.hypot(p.x-q.x,p.y-q.y);if(dd<LNK){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle='rgba(201,169,98,'+(.06*(1-dd/LNK)).toFixed(3)+')';ctx.lineWidth=.5;ctx.stroke();}}
-    }
-    requestAnimationFrame(tick);
-  }
-  tick();
-})();
 
-// ===== Portal =====
-const DATA = __DATA__;
-const CATS = __CATS__;
-const ICONS = {"数据看板":"bar-chart-3","知识库与文档":"book-open","内容创作工具":"pen-tool","数据表":"table"};
-const CAT_COLORS = {"数据看板":"#c9a962","知识库与文档":"#6bb5a8","内容创作工具":"#d4856e","数据表":"#a09ac9"};
-const content=document.getElementById('content');const chips=document.getElementById('chips');const q=document.getElementById('q');
-let activeCat="All";
-function renderChips(){
-  chips.innerHTML="";
-  [{k:"All",l:"All"},...CATS.map(function(c){return{k:c,l:c}})].forEach(function(o){
-    var el=document.createElement('button');
-    el.className='chip'+(o.k===activeCat?' active':'');
-    el.textContent=o.l;
-    el.onclick=function(){activeCat=o.k;renderChips();render()};chips.appendChild(el)})
-}
-function esc(s){return String(s).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
-function render(){
-  var kw=q.value.trim().toLowerCase();
-  var filtered=DATA.filter(function(e){var okCat=activeCat==="All"||e.cat===activeCat;return okCat&&(!kw||e.name.toLowerCase().includes(kw)||e.url.toLowerCase().includes(kw))});
-  if(!filtered.length){content.innerHTML='<div class="empty">No tools match</div>';lucide.createIcons();return;}
-  var html="";
-  CATS.forEach(function(cat,idx){
-    var list=filtered.filter(function(e){return e.cat===cat});if(!list.length)return;
-    var icon=ICONS[cat]||"box";
-    html+='<div class="section s-'+idx+'"><div class="section-bg"></div><div class="section-deco"></div><div class="section-deco-corner"></div><div class="section-header"><i data-lucide="'+icon+'" style="width:15px;height:15px;color:'+(CAT_COLORS[cat]||"#c9a962")+'"></i><h2>'+esc(cat)+'</h2><span class="count">'+list.length+'</span><span class="accent-line"></span></div><div class="grid">'+list.map(function(e){return'<a class="card" href="'+esc(e.url)+'" target="_blank" rel="noopener"><div class="card-icon"><i data-lucide="'+icon+'"></i></div><div class="card-body"><div class="name">'+esc(e.name)+'</div><div class="meta">'+esc(e.cat)+'</div></div></a>'}).join('')+'</div></div>';
-  });
-  content.innerHTML=html;lucide.createIcons();
-}
-renderChips();render();lucide.createIcons();
-</script>
-</body>
-</html>
-"""
-
-HTML = (HTML
-        .replace("__DATA__", data_json)
-        .replace("__CATS__", cats_json)
-        .replace("__GEN__", gen_time))
-
-with open(OUT, "w", encoding="utf-8") as f:
-    f.write(HTML)
-
-print(f"OK 解析到 {len(entries)} 个工具，分类 {cats}")
-print(f"  - 表头跳过 {skipped_header} 行，分组标题 {skipped_group} 个")
-if skipped_incomplete:
-    print(f"  - 警告：{len(skipped_incomplete)} 行只有名称、缺少链接或分类，未收录 -> {skipped_incomplete}")
-print(f"已生成 -> {OUT}")
+if __name__ == "__main__":
+    main()

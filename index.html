@@ -262,7 +262,7 @@ body.js .reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transfor
 
 <footer class="footer">
   <p data-i18n="footer">ITO · AI 工具集 · 内部使用 · 持续更新中</p>
-  <p class="ver">v1.1.0 · glass build</p>
+  <p class="ver">v1.1.0 · glass build · 2026-08-05 14:31</p>
 </footer>
 
 <script>
@@ -326,40 +326,8 @@ body.js .reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transfor
   }
 
   /* ---------- data (real AI-Toolset content, bilingual) ---------- */
-  var CATS = [
-    {key:'dash',label:{zh:'数据看板',en:'Dashboards'},icon:'dashboard',accent:'#7C3AED'},
-    {key:'docs',label:{zh:'知识库与文档',en:'Docs & Knowledge'},icon:'bookOpen',accent:'#EC4899'},
-    {key:'create',label:{zh:'内容创作工具',en:'Content Tools'},icon:'pen',accent:'#06B6D4'},
-    {key:'sheet',label:{zh:'数据表',en:'Data Tables'},icon:'table',accent:'#7C3AED'},
-    {key:'news',label:{zh:'AI 资讯',en:'AI News'},icon:'news',accent:'#EC4899'}
-  ];
-  var TOOLS = [
-    {cat:'dash',name:'ITO产品销售分析看板',desc:{zh:'按系列 SKU 拆解销售表现',en:'Sales performance by series and SKU'},url:'https://ito-opal.vercel.app/product_dashboard.html',icon:'barChart'},
-    {cat:'dash',name:'ITO电商渠道业绩看板',desc:{zh:'9 渠道月度目标与实际追踪',en:'9 channels: monthly target vs actual'},url:'https://ito-opal.vercel.app/channel_dashboard.html',icon:'trending'},
-    {cat:'dash',name:'抖音主播数据看板',desc:{zh:'三店主播实时直播数据',en:'Live-stream data across 3 stores'},url:'https://mightymojoy.github.io/live-dashboard/index.html',icon:'monitor'},
-    {cat:'dash',name:'抖音主播数据趋势分析',desc:{zh:'主播历史趋势与对比',en:'Host trends and comparison'},url:'https://mightymojoy.github.io/live-dashboard/trend.html',icon:'activity'},
-    {cat:'dash',name:'抖音店铺数据看板',desc:{zh:'抖音自营店铺经营概览',en:'Douyin store operations overview'},url:'https://mightymojoy.github.io/douyin_dashboard/',icon:'store'},
-    {cat:'dash',name:'京东毛保监控',desc:{zh:'京东自营毛利保护每日看板',en:'JD self-operated margin protection daily'},url:'https://66396c5698674ebe9ee8a78092ef1298.app.codebuddy.work/',icon:'shield'},
-    {cat:'dash',name:'店铺优惠券数据监控',desc:{zh:'优惠券投放与核销监控',en:'Coupon delivery and redemption monitor'},url:'https://metabase.doris.itocases.com/question/81?trade_time=2026-07&shop_no=01',icon:'ticket'},
-    {cat:'dash',name:'ITO库存看板',desc:{zh:'全渠道库存水位与周转',en:'Omni-channel inventory and turnover'},url:'https://ito-inventory-dashboard.vercel.app/',icon:'package'},
-
-    {cat:'docs',name:'ITO产品介绍',desc:{zh:'全系产品资料与卖点',en:'Full product catalog and selling points'},url:'https://mightymojoy.github.io/-product/index.html',icon:'book'},
-    {cat:'docs',name:'ITO新品介绍',desc:{zh:'新品上市资料中心',en:'New product launch resource center'},url:'https://itonewproduct.vercel.app/',icon:'sparkles'},
-    {cat:'docs',name:'新品上线进度概览',desc:{zh:'新品上市流程进度看板',en:'New product launch progress board'},url:'https://eb9eff2f00b04a7793204efaf962e601.app.codebuddy.work/',icon:'kanban'},
-    {cat:'docs',name:'ITO AI AGENT 测试',desc:{zh:'AI 评分与 Agent 测试台',en:'AI scoring and agent testing bench'},url:'https://ito-ai-grading.vercel.app/agent-exam.html',icon:'bot'},
-    {cat:'docs',name:'AI培训视频讲解',desc:{zh:'AI 实操培训视频（待解锁）',en:'AI hands-on training videos (locked)'},url:'https://my.feishu.cn/wiki/CpNCwXfGVi0m3kksKRgcbrqcnuc',icon:'play',locked:true},
-
-    {cat:'create',name:'ITO内容短视频脚本生成器',desc:{zh:'抖音短视频脚本一键生成',en:'One-click Douyin short-video scripts'},url:'https://mightymojoy.github.io/NEW-DY-short-videos/',icon:'video'},
-    {cat:'create',name:'ITO摄影提示词精准控制生成',desc:{zh:'产品摄影提示词工坊',en:'Product photography prompt studio'},url:'https://mightymojoy.github.io/ITO-PROMPT-STUDIO/ITO-Prompt-Studio.html',icon:'camera'},
-
-    {cat:'sheet',name:'每日库存表',desc:{zh:'飞书每日库存明细表',en:'Feishu daily inventory sheet'},url:'https://my.feishu.cn/wiki/CgBmw84OSikaKZk0jImckrNjnug?sheet=kGV1ky',icon:'table'},
-    {cat:'sheet',name:'京东毛保',desc:{zh:'京东毛保明细数据表',en:'JD margin-protection data sheet'},url:'https://my.feishu.cn/wiki/W6vewSdagixfhOkNqA0cAWtPn2e?sheet=iC9wkH',icon:'table'},
-    {cat:'sheet',name:'电商渠道业绩',desc:{zh:'渠道业绩明细表',en:'Channel performance sheet'},url:'https://my.feishu.cn/sheets/CtZuseYAyhrJPgtGBxFc755Vnge?sheet=JOlwMJ',icon:'table'},
-    {cat:'sheet',name:'电商渠道商品',desc:{zh:'渠道在售商品表',en:'Channel product listing sheet'},url:'https://my.feishu.cn/sheets/RKudsmnm3h2cOPtvv4ScTEzSnCh',icon:'table'},
-    {cat:'sheet',name:'新品上市全流程',desc:{zh:'新品上市流程管理表',en:'New product launch workflow sheet'},url:'https://my.feishu.cn/wiki/QWb6wpxXAiBjsjk3o9Qc98HunNe?table=tbljqLJy1V5S4cFP&view=vewfJNQRH2',icon:'table'},
-
-    {cat:'news',name:'AI HOT 每日晨报',desc:{zh:'每日 AI 行业早报',en:'Daily AI industry morning brief'},url:'https://4ac9877daaf74f81962a2b05a0d57e25.gz2.agentos-app.net/',icon:'zap'}
-  ];
+  var CATS = [{"key": "dash", "label": {"zh": "数据看板", "en": "Dashboards"}, "icon": "dashboard", "accent": "#7C3AED"}, {"key": "docs", "label": {"zh": "知识库与文档", "en": "Docs & Knowledge"}, "icon": "bookOpen", "accent": "#EC4899"}, {"key": "create", "label": {"zh": "内容创作工具", "en": "Content Tools"}, "icon": "pen", "accent": "#06B6D4"}, {"key": "sheet", "label": {"zh": "数据表", "en": "Data Tables"}, "icon": "table", "accent": "#7C3AED"}, {"key": "news", "label": {"zh": "AI资讯", "en": "AI News"}, "icon": "news", "accent": "#EC4899"}];
+  var TOOLS = [{"cat": "dash", "name": "ITO产品销售分析看板", "url": "https://ito-opal.vercel.app/product_dashboard.html", "icon": "barChart", "desc": {"zh": "按系列 SKU 拆解销售表现", "en": "Sales performance by series and SKU"}, "locked": false}, {"cat": "dash", "name": "ITO电商渠道业绩看板", "url": "https://ito-opal.vercel.app/channel_dashboard.html", "icon": "trending", "desc": {"zh": "9 渠道月度目标与实际追踪", "en": "9 channels: monthly target vs actual"}, "locked": false}, {"cat": "docs", "name": "ITO产品介绍", "url": "https://mightymojoy.github.io/-product/index.html", "icon": "book", "desc": {"zh": "全系产品资料与卖点", "en": "Full product catalog and selling points"}, "locked": false}, {"cat": "dash", "name": "抖音主播数据看板", "url": "https://mightymojoy.github.io/live-dashboard/index.html", "icon": "monitor", "desc": {"zh": "三店主播实时直播数据", "en": "Live-stream data across 3 stores"}, "locked": false}, {"cat": "dash", "name": "抖音主播数据趋势分析", "url": "https://mightymojoy.github.io/live-dashboard/trend.html", "icon": "activity", "desc": {"zh": "主播历史趋势与对比", "en": "Host trends and comparison"}, "locked": false}, {"cat": "dash", "name": "抖音店铺数据看板", "url": "https://mightymojoy.github.io/douyin_dashboard/", "icon": "store", "desc": {"zh": "抖音自营店铺经营概览", "en": "Douyin store operations overview"}, "locked": false}, {"cat": "create", "name": "ITO内容短视频脚本生成器", "url": "https://mightymojoy.github.io/NEW-DY-short-videos/", "icon": "video", "desc": {"zh": "抖音短视频脚本一键生成", "en": "One-click Douyin short-video scripts"}, "locked": false}, {"cat": "create", "name": "ITO摄影提示词精准控制生成", "url": "https://mightymojoy.github.io/ITO-PROMPT-STUDIO/ITO-Prompt-Studio.html", "icon": "camera", "desc": {"zh": "产品摄影提示词工坊", "en": "Product photography prompt studio"}, "locked": false}, {"cat": "docs", "name": "ITO新品介绍", "url": "https://itonewproduct.vercel.app/", "icon": "sparkles", "desc": {"zh": "新品上市资料中心", "en": "New product launch resource center"}, "locked": false}, {"cat": "dash", "name": "京东毛保监控", "url": "https://66396c5698674ebe9ee8a78092ef1298.app.codebuddy.work/", "icon": "shield", "desc": {"zh": "京东自营毛利保护每日看板", "en": "JD self-operated margin protection daily"}, "locked": false}, {"cat": "dash", "name": "店铺优惠券数据监控", "url": "https://metabase.doris.itocases.com/question/81?trade_time=2026-07&shop_no=01", "icon": "ticket", "desc": {"zh": "优惠券投放与核销监控", "en": "Coupon delivery and redemption monitor"}, "locked": false}, {"cat": "docs", "name": "新品上线进度概览", "url": "https://eb9eff2f00b04a7793204efaf962e601.app.codebuddy.work/", "icon": "kanban", "desc": {"zh": "新品上市流程进度看板", "en": "New product launch progress board"}, "locked": false}, {"cat": "docs", "name": "ITO AI AGENT 测试", "url": "https://ito-ai-grading.vercel.app/agent-exam.html", "icon": "bot", "desc": {"zh": "AI 评分与 Agent 测试台", "en": "AI scoring and agent testing bench"}, "locked": false}, {"cat": "dash", "name": "ITO库存看板", "url": "https://ito-inventory-dashboard.vercel.app/", "icon": "package", "desc": {"zh": "全渠道库存水位与周转", "en": "Omni-channel inventory and turnover"}, "locked": false}, {"cat": "sheet", "name": "每日库存表", "url": "https://my.feishu.cn/wiki/CgBmw84OSikaKZk0jImckrNjnug?sheet=kGV1ky", "icon": "table", "desc": {"zh": "飞书每日库存明细表", "en": "Feishu daily inventory sheet"}, "locked": false}, {"cat": "sheet", "name": "京东毛保", "url": "https://my.feishu.cn/wiki/W6vewSdagixfhOkNqA0cAWtPn2e?sheet=iC9wkH", "icon": "table", "desc": {"zh": "京东毛保明细数据表", "en": "JD margin-protection data sheet"}, "locked": false}, {"cat": "sheet", "name": "电商渠道业绩", "url": "https://my.feishu.cn/sheets/CtZuseYAyhrJPgtGBxFc755Vnge?sheet=JOlwMJ", "icon": "table", "desc": {"zh": "渠道业绩明细表", "en": "Channel performance sheet"}, "locked": false}, {"cat": "sheet", "name": "电商渠道商品", "url": "https://my.feishu.cn/sheets/RKudsmnm3h2cOPtvv4ScTEzSnCh", "icon": "table", "desc": {"zh": "渠道在售商品表", "en": "Channel product listing sheet"}, "locked": false}, {"cat": "sheet", "name": "新品上市全流程", "url": "https://my.feishu.cn/wiki/QWb6wpxXAiBjsjk3o9Qc98HunNe?table=tbljqLJy1V5S4cFP&view=vewfJNQRH2#CategoryAutomatedNotification", "icon": "table", "desc": {"zh": "新品上市流程管理表", "en": "New product launch workflow sheet"}, "locked": false}, {"cat": "docs", "name": "AI培训视频讲解", "url": "", "icon": "play", "desc": {"zh": "AI 实操培训视频（待解锁）", "en": "AI hands-on training videos (locked)"}, "locked": true}, {"cat": "news", "name": "AI HOT 每日晨报", "url": "https://4ac9877daaf74f81962a2b05a0d57e25.gz2.agentos-app.net/", "icon": "zap", "desc": {"zh": "每日 AI 行业早报", "en": "Daily AI industry morning brief"}, "locked": false}];
   TOOLS.forEach(function(t,i){t._i=i;});
 
   var ACCENTS = ['a-violet','a-pink','a-cyan'];
