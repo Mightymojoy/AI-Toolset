@@ -5,9 +5,10 @@ echo   ITO AI 工具集门户刷新
 echo ================================
 echo.
 
-set PYTHON=C:\Users\yh200\.workbuddy\binaries\python\envs\default\Scripts\python.exe
-set SCRIPT=E:\AI工具集\build_portal.py
-set REPO=E:\AI工具集
+set PYTHON=C:\Users\QwQ\.workbuddy\binaries\python\versions\3.13.12\python.exe
+set SCRIPT=D:\E盘文件\AI工具集\build_portal.py
+set REPO=D:\E盘文件\AI工具集
+set GIT=C:\Users\QwQ\.workbuddy\binaries\PortableGit\versions\1.2.0\mingw64\bin\git.exe
 
 if not exist "%PYTHON%" (
     echo [ERROR] 未找到 Python：%PYTHON%
@@ -18,14 +19,15 @@ if not exist "%PYTHON%" (
 
 if not exist "%SCRIPT%" (
     echo [ERROR] 未找到 build_portal.py：%SCRIPT%
-    echo 请确认本 bat 与仓库位于 E:\AI工具集\ 下。
+    echo 请确认本 bat 与仓库位于 D:\E盘文件\AI工具集\ 下。
     pause
     exit /b 1
 )
 
 echo [0/4] 同步最新仓库（git pull --ff-only）...
 cd /d "%REPO%"
-git pull --ff-only
+set GIT_TERMINAL_PROMPT=0
+"%GIT%" pull --ff-only
 if %errorlevel% neq 0 (
     echo [WARN] 拉取失败（可能离线或本地有冲突改动），将使用本地现有脚本继续。
 ) else (
@@ -43,8 +45,8 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/4] 提交到 Git...
-git add -A
-git commit -m "auto: update toolset portal"
+"%GIT%" add -A
+"%GIT%" commit -m "auto: update toolset portal"
 if %errorlevel% neq 0 (
     if %errorlevel% equ 1 (
         echo [INFO] 没有变化需要提交，跳过推送。
@@ -55,7 +57,7 @@ if %errorlevel% neq 0 (
     )
 ) else (
     echo [3/4] 推送到 GitHub...
-    git push origin main
+    "%GIT%" push origin main
     if %errorlevel% neq 0 (
         echo [ERROR] Git 推送失败（检查网络 / 凭证）。
         pause
@@ -66,9 +68,9 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo 门户文件：E:\AI工具集\index.html
+echo 门户文件：D:\E盘文件\AI工具集\index.html
 echo.
 echo 按任意键打开门户...
 pause
 
-start "" "E:\AI工具集\index.html"
+start "" "D:\E盘文件\AI工具集\index.html"
