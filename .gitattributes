@@ -1,0 +1,6 @@
+# 行尾纪律（2026-10-12 事故后新增）
+# 起因：刷新工具集门户.bat 被写入时用了 LF 行尾，cmd.exe 解析 .bat 依赖 CRLF，
+#       导致 if(...) 块解析崩溃、窗口一闪而过（"闪退"）。
+# 作用：无论本机 core.autocrlf 将来怎么变，这两个扩展名检出时一律强制 CRLF。
+*.bat text eol=crlf
+*.cmd text eol=crlf
