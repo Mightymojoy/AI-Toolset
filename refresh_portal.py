@@ -170,15 +170,37 @@ def git_exe():
     return None
 
 
+def _git_env(exe):
+    """给 git 子进程准备环境变量。
+
+    关键：只找到 git.exe 还不够。git 的很多操作（pull / push / commit 触发
+    hook 等）会**再 spawn 一个 git 子进程**，它靠 PATH 查找。用户双击 bat 时
+    系统 PATH 里没有 WorkBuddy 的 git，于是出现
+        error: cannot spawn git: No such file or directory
+    —— 表现为 pull 直接失败、commit "报错却成功"、push 必然失败。
+    所以必须把 git 自己的 bin 目录前置注入 PATH。
+    """
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    bindir = os.path.dirname(exe)                       # ...\mingw64\bin
+    root = os.path.dirname(os.path.dirname(bindir))     # ...\<版本目录>
+    parts = [bindir]
+    usrbin = os.path.join(root, "usr", "bin")           # 内含 sh.exe 等辅助程序
+    if os.path.isdir(usrbin):
+        parts.append(usrbin)
+    old = env.get("PATH", "")
+    env["PATH"] = os.pathsep.join(parts + ([old] if old else []))
+    return env
+
+
 def git(args, cwd=HERE, **kw):
     exe = git_exe()
     if not exe:
         # 具体原因已由 git_exe() 完整输出，这里不再重复刷屏
         return 1
     say("    $ git " + " ".join(args))
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
     try:
-        return subprocess.run([exe] + args, cwd=cwd, env=env, **kw).returncode
+        return subprocess.run([exe] + args, cwd=cwd, env=_git_env(exe),
+                              **kw).returncode
     except OSError as exc:
         say("[ERROR] git 调用失败：%s" % exc)
         return 1
@@ -191,7 +213,7 @@ def current_branch():
     try:
         out = subprocess.run([exe, "rev-parse", "--abbrev-ref", "HEAD"],
                              cwd=HERE, capture_output=True, text=True,
-                             env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+                             env=_git_env(exe))
         name = (out.stdout or "").strip()
         return name or "main"
     except OSError:
